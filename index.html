@@ -87,6 +87,11 @@ body { font-family:-apple-system,Arial,sans-serif; background:var(--warm); min-h
 .backb { color:rgba(255,255,255,0.6); font-size:12px; cursor:pointer; background:none; border:none; font-family:inherit; white-space:nowrap; }
 .vtitle { flex:1; font-size:13px; font-weight:600; color:white; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .saveb { background:var(--brick); color:white; border:none; padding:7px 14px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+.fixed-save { position:fixed; bottom:16px; right:16px; z-index:100; background:var(--brick); color:white; border:none; padding:12px 20px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 4px 16px rgba(184,92,58,0.5); border-radius:2px; }
+.fixed-save:active { background:#9a4a2c; }
+.fixed-save { position:fixed; bottom:0; left:0; right:0; z-index:100; background:var(--dark); padding:10px 16px; display:flex; justify-content:center; max-width:680px; margin:0 auto; }
+.fixed-save-btn { background:var(--brick); color:white; border:none; padding:12px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; width:100%; max-width:400px; }
+.body { padding-bottom:60px; }
 .tabs { display:flex; background:white; border-bottom:1.5px solid var(--rule); overflow-x:auto; }
 .tab { flex:1; min-width:55px; padding:10px 6px; font-size:11px; font-weight:600; border:none; background:none; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1.5px; cursor:pointer; white-space:nowrap; font-family:inherit; }
 .tab.on { color:var(--brick); border-bottom-color:var(--brick); }
@@ -455,6 +460,9 @@ function rVis(){
   <div class="vpage">
     <div class="tabs no-print">${th}</div>
     <div class="body"><div class="sec">${b}</div></div>
+  </div>
+  <div class="fixed-save no-print">
+    <button class="fixed-save-btn" id="fixed-sb" onclick="saveAll()">Сохранить всё</button>
   </div>`
 }
 
@@ -491,6 +499,31 @@ function autoSaveMeta(){
   }, 800)
 }
 
+async function saveAll(){
+  const btn = document.getElementById('fixed-sb')
+  if(btn) btn.textContent = 'Сохраняю...'
+  saveTabState()
+  // Save meta
+  const obj = S.visit.object_name||''
+  const num = S.visit.visit_number||1
+  const date = S.visit.visit_date||''
+  const auth = S.visit.author||''
+  const stage = S.visit.stage||''
+  await sb.from('visits').update({object_name:obj,visit_number:num,visit_date:date,author:auth,stage}).eq('id',S.cid)
+  S.visit={...S.visit,object_name:obj,visit_number:num,visit_date:date,author:auth,stage}
+  const vIdx=S.visits.findIndex(v=>v.id===S.cid)
+  if(vIdx>=0) S.visits[vIdx]={...S.visits[vIdx],...S.visit}
+  // Save protocol
+  await sb.from('protocol').upsert({
+    visit_id:S.cid,
+    attendees:S.proto.attendees||'',
+    discussed:JSON.stringify(S.proto.items||[]),
+    agreed:'',
+    next_visit:S.proto.next_visit||''
+  },{onConflict:'visit_id'})
+  if(btn){btn.textContent='Сохранено ✓';setTimeout(()=>btn.textContent='Сохранить всё',2000)}
+}
+
 async function saveV(){
   saveTabState();
   const btn=$('sb'); if(btn)btn.textContent='Сохраняю...'
@@ -505,7 +538,8 @@ async function saveV(){
   const vIdx = S.visits.findIndex(v=>v.id===S.cid)
   if(vIdx>=0) S.visits[vIdx]={...S.visits[vIdx],...S.visit}
   await saveProto()
-  if(btn){btn.textContent='Сохранено!';setTimeout(()=>btn.textContent='Сохранить',1500)}
+  const btns = [document.getElementById('sb'), document.getElementById('fixed-sb')]
+  btns.forEach(b=>{ if(b){b.textContent='Сохранено! ✓';setTimeout(()=>b.textContent=b.id==='fixed-sb'?'Сохранить ↑':'Сохранить',1500)} })
 }
 
 async function bk(){
