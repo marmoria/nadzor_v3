@@ -1052,47 +1052,6 @@ function printPdf(){
 
 init()
 </script>
-<script>
-// Service Worker для офлайн кеширования
-if('serviceWorker' in navigator){
-  const swCode = `
-const CACHE = 'uzhas-v1';
-const ASSETS = ['/nadzor_v3/', '/nadzor_v3/index.html', '/nadzor_v3/icon.png', '/nadzor_v3/manifest.json'];
-
-self.addEventListener('install', e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));
-});
-
-self.addEventListener('activate', e=>{
-  e.waitUntil(clients.claim());
-});
-
-self.addEventListener('fetch', e=>{
-  const url = new URL(e.request.url);
-  // Для Supabase запросов — только сеть (не кешируем данные)
-  if(url.hostname.includes('supabase.co')){
-    e.respondWith(fetch(e.request).catch(()=>new Response(JSON.stringify([]),{headers:{'Content-Type':'application/json'}})));
-    return;
-  }
-  // Для остального — сначала кеш, потом сеть
-  e.respondWith(caches.match(e.request).then(cached=>{
-    if(cached) return cached;
-    return fetch(e.request).then(resp=>{
-      if(resp.ok){
-        const clone = resp.clone();
-        caches.open(CACHE).then(c=>c.put(e.request,clone));
-      }
-      return resp;
-    }).catch(()=>cached||new Response('Нет подключения'));
-  }));
-});
-`;
-  const blob = new Blob([swCode], {type:'application/javascript'});
-  const url = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(url, {scope:'/nadzor_v3/'})
-    .then(()=>console.log('SW registered'))
-    .catch(e=>console.log('SW error:', e));
-}
-</script>
+<!-- Service Worker removed -->
 </body>
 </html>
