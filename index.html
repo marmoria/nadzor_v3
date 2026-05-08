@@ -252,6 +252,11 @@ function tod(){return new Date().toISOString().split('T')[0];}
 function $(id){return document.getElementById(id)}
 
 // ===== AUTH =====
+// localStorage helpers with user isolation
+function lsKey(k){ return (S.user?.id||'anon')+'_'+k }
+function lsSet(k, v){ try{ localStorage.setItem(lsKey(k), JSON.stringify(v)) }catch(e){} }
+function lsGet(k){ try{ const v=localStorage.getItem(lsKey(k)); return v?JSON.parse(v):null }catch(e){return null} }
+
 async function init(){
   const {data:{session}} = await sb.auth.getSession()
   if(session){S.user=session.user; await loadVisits()}
@@ -362,15 +367,25 @@ function getErrMsg(error){
 
 // ===== VISITS =====
 async function loadVisits(showLoading=true){
-  if(showLoading && S.visits.length===0){
+  // Show cached data immediately
+  const cached = lsGet('visits')
+  if(cached && cached.length>0){
+    S.visits = cached
+    S.screen='visits'
+    render()
+  } else if(showLoading){
     $('app').innerHTML = renderHdr() + '<div class="pg"><div class="loading">Загрузка...</div></div>'
   }
+  // Then fetch fresh data
   const {data,error} = await sb.from('visits').select('*')
     .eq('user_id', S.user.id)
     .order('created_at',{ascending:false})
-  S.visits = data||[]
-  S.screen='visits'
-  render()
+  if(!error && data){
+    S.visits = data
+    lsSet('visits', data)
+    S.screen='visits'
+    render()
+  }
 }
 
 function renderHdr(){
@@ -425,9 +440,11 @@ async function openV(id){
     S.screen='visit'; S.tab='meta'; render(); return;
   }
   S.cid=id; S.screen='visit'; S.tab='meta'
-  // Show cached data immediately if available
-  if(S.visit && S.visit.id===id){
-    render();
+  // Show cached data immediately
+  const cached = lsGet('visit_'+id)
+  if(cached){
+    S.visit=cached.visit; S.tasks=cached.tasks||[]; S.obs=cached.obs||[]; S.proto=cached.proto||{items:[{discussed:'',agreed:''}]}
+    render()
   } else {
     $('app').innerHTML = '<div class="loading" style="padding:40px;text-align:center;color:var(--muted)">Загрузка...</div>'
   }
@@ -442,6 +459,8 @@ async function openV(id){
   let protoItems=[{discussed:'',agreed:''}]
   if(rawProto.discussed){try{const parsed=JSON.parse(rawProto.discussed);if(Array.isArray(parsed))protoItems=parsed}catch(e){if(rawProto.discussed)protoItems=[{discussed:rawProto.discussed,agreed:rawProto.agreed||''}]}}
   S.proto={attendees:rawProto.attendees||'',next_visit:rawProto.next_visit||'',items:protoItems}
+  // Cache visit data locally
+  lsSet('visit_'+id, {visit:S.visit, tasks:S.tasks, obs:S.obs, proto:S.proto})
   render()
 }
 
@@ -464,8 +483,10 @@ function rVis(){
     <div class="tabs no-print">${th}</div>
     <div class="body"><div class="sec">${b}</div></div>
   </div>
-  <div class="fixed-save no-print">
-    <button class="fixed-save-btn" id="fixed-sb" onclick="saveAll()">Сохранить всё</button>
+  <div class="fixed-btns no-print">
+    ${S.tab==='obs'?'<button class="fixed-add" onclick="aO()">+ Фото</button>':''}
+    ${S.tab==='tasks'?'<button class="fixed-add" onclick="document.getElementById(\'nt\').focus()">+ Задача</button>':''}
+    <button class="fixed-save" id="fixed-sb" onclick="saveV()">Сохранить</button>
   </div>`
 }
 
@@ -540,6 +561,7 @@ async function saveV(){
   // Update visits cache
   const vIdx = S.visits.findIndex(v=>v.id===S.cid)
   if(vIdx>=0) S.visits[vIdx]={...S.visits[vIdx],...S.visit}
+  lsSet('visits', S.visits)
   await saveProto()
   const btns = [document.getElementById('sb'), document.getElementById('fixed-sb')]
   btns.forEach(b=>{ if(b){b.textContent='Сохранено! ✓';setTimeout(()=>b.textContent=b.id==='fixed-sb'?'Сохранить ↑':'Сохранить',1500)} })
@@ -602,7 +624,7 @@ async function editTask(id,i,val){
   await sb.from('tasks').update({text}).eq('id',id)
 }
 
-async function togT(id,i){const done=!S.tasks[i].done;await sb.from('tasks').update({done}).eq('id',id);S.tasks[i].done=done;render();}
+async function togT(id,i){const done=!S.tasks[i].done;await sb.from('tasks').update({done}).eq('id',id);S.tasks[i].done=done;lsSet('visit_'+S.cid,{visit:S.visit,tasks:S.tasks,obs:S.obs,proto:S.proto});render();}
 async function delT(id,i){await sb.from('tasks').delete().eq('id',id);S.tasks.splice(i,1);render();}
 
 function tObs(){
@@ -930,6 +952,7 @@ async function saveProto(silent=false){
     next_visit:S.proto.next_visit||''
   },{onConflict:'visit_id'})
   if(btn&&!silent){btn.textContent='Сохранено!';setTimeout(()=>btn.textContent='Сохранить протокол',1500)}
+  lsSet('visit_'+S.cid, {visit:S.visit, tasks:S.tasks, obs:S.obs, proto:S.proto})
 }
 
 function tRep(v){
