@@ -87,15 +87,18 @@ body { font-family:-apple-system,Arial,sans-serif; background:var(--warm); min-h
 .backb { color:rgba(255,255,255,0.6); font-size:12px; cursor:pointer; background:none; border:none; font-family:inherit; white-space:nowrap; }
 .vtitle { flex:1; font-size:13px; font-weight:600; color:white; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .saveb { background:var(--brick); color:white; border:none; padding:7px 14px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
-.fixed-save { position:fixed; bottom:16px; right:16px; z-index:100; background:var(--brick); color:white; border:none; padding:12px 20px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 4px 16px rgba(184,92,58,0.5); border-radius:2px; }
+.fixed-btns { position:fixed; bottom:16px; right:16px; z-index:100; display:flex; gap:8px; align-items:center; }
+.fixed-save { background:var(--brick); color:white; border:none; padding:12px 20px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 4px 16px rgba(184,92,58,0.4); }
 .fixed-save:active { background:#9a4a2c; }
+.fixed-add { background:var(--dark); color:white; border:none; padding:12px 18px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+.fixed-add:active { background:#333; }
 .fixed-save { position:fixed; bottom:0; left:0; right:0; z-index:100; background:var(--dark); padding:10px 16px; display:flex; justify-content:center; max-width:680px; margin:0 auto; }
 .fixed-save-btn { background:var(--brick); color:white; border:none; padding:12px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; width:100%; max-width:400px; }
 .body { padding-bottom:60px; }
 .tabs { display:flex; background:white; border-bottom:1.5px solid var(--rule); overflow-x:auto; }
 .tab { flex:1; min-width:55px; padding:10px 6px; font-size:11px; font-weight:600; border:none; background:none; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1.5px; cursor:pointer; white-space:nowrap; font-family:inherit; }
 .tab.on { color:var(--brick); border-bottom-color:var(--brick); }
-.body { flex:1; padding:14px; }
+.body { flex:1; padding:14px; padding-bottom:72px; }
 .sec { display:flex; flex-direction:column; gap:12px; }
 .fld { display:flex; flex-direction:column; gap:4px; }
 .lbl { font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); }
@@ -1014,6 +1017,48 @@ function printPdf(){
 }
 
 init()
+</script>
+<script>
+// Service Worker для офлайн кеширования
+if('serviceWorker' in navigator){
+  const swCode = `
+const CACHE = 'uzhas-v1';
+const ASSETS = ['/nadzor_v3/', '/nadzor_v3/index.html', '/nadzor_v3/icon.png', '/nadzor_v3/manifest.json'];
+
+self.addEventListener('install', e=>{
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));
+});
+
+self.addEventListener('activate', e=>{
+  e.waitUntil(clients.claim());
+});
+
+self.addEventListener('fetch', e=>{
+  const url = new URL(e.request.url);
+  // Для Supabase запросов — только сеть (не кешируем данные)
+  if(url.hostname.includes('supabase.co')){
+    e.respondWith(fetch(e.request).catch(()=>new Response(JSON.stringify([]),{headers:{'Content-Type':'application/json'}})));
+    return;
+  }
+  // Для остального — сначала кеш, потом сеть
+  e.respondWith(caches.match(e.request).then(cached=>{
+    if(cached) return cached;
+    return fetch(e.request).then(resp=>{
+      if(resp.ok){
+        const clone = resp.clone();
+        caches.open(CACHE).then(c=>c.put(e.request,clone));
+      }
+      return resp;
+    }).catch(()=>cached||new Response('Нет подключения'));
+  }));
+});
+`;
+  const blob = new Blob([swCode], {type:'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url, {scope:'/nadzor_v3/'})
+    .then(()=>console.log('SW registered'))
+    .catch(e=>console.log('SW error:', e));
+}
 </script>
 </body>
 </html>
