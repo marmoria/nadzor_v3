@@ -87,11 +87,11 @@ body { font-family:-apple-system,Arial,sans-serif; background:var(--warm); min-h
 .backb { color:rgba(255,255,255,0.6); font-size:12px; cursor:pointer; background:none; border:none; font-family:inherit; white-space:nowrap; }
 .vtitle { flex:1; font-size:13px; font-weight:600; color:white; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .saveb { background:var(--brick); color:white; border:none; padding:7px 14px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
-.fixed-btns { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:680px; z-index:100; display:flex; border-top:1px solid var(--rule); background:white; }
-.fixed-save { flex:1; background:var(--brick); color:white; border:none; padding:14px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+.fixed-btns { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:680px; z-index:100; display:flex; border-top:1px solid var(--rule); }
+.fixed-save { flex:1; background:var(--brick); color:white; border:none; padding:16px 14px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
 .fixed-save:active { background:#9a4a2c; }
-.fixed-add { flex:1; background:var(--dark); color:white; border:none; padding:14px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; border-right:1px solid rgba(255,255,255,0.1); }
-.fixed-add:active { background:#333; }
+.fixed-add { flex:1; background:var(--dark); color:white; border:none; padding:16px 14px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; border-right:1px solid rgba(255,255,255,0.15); }
+.fixed-add:active { opacity:0.8; }
 .fixed-save { position:fixed; bottom:0; left:0; right:0; z-index:100; background:var(--dark); padding:10px 16px; display:flex; justify-content:center; max-width:680px; margin:0 auto; }
 .fixed-save-btn { background:var(--brick); color:white; border:none; padding:12px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; width:100%; max-width:400px; }
 .body { padding-bottom:60px; }
@@ -484,8 +484,7 @@ function rVis(){
     <div class="body"><div class="sec">${b}</div></div>
   </div>
   <div class="fixed-btns no-print">
-    ${S.tab==='obs'?'<button class="fixed-add" onclick="aO()">+ Фото</button>':''}
-    ${S.tab==='tasks'?'<button class="fixed-add" onclick="document.getElementById(\'nt\').focus()">+ Задача</button>':''}
+    ${getAddBtn()}
     <button class="fixed-save" id="fixed-sb" onclick="saveV()">Сохранить</button>
   </div>`
 }
@@ -546,6 +545,18 @@ async function saveAll(){
     next_visit:S.proto.next_visit||''
   },{onConflict:'visit_id'})
   if(btn){btn.textContent='Сохранено ✓';setTimeout(()=>btn.textContent='Сохранить всё',2000)}
+}
+
+function getAddBtn(){
+  if(S.tab==='obs') return '<button class="fixed-add" onclick="aO()">+ Фото</button>'
+  if(S.tab==='tasks') return '<button class="fixed-add" onclick="focusTask()">+ Задача</button>'
+  if(S.tab==='proto') return '<button class="fixed-add" onclick="addProtoItem()">+ Пункт</button>'
+  return ''
+}
+
+function focusTask(){
+  const el = document.getElementById('nt')
+  if(el) el.focus()
 }
 
 async function saveV(){
